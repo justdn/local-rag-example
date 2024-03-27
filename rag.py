@@ -1,6 +1,6 @@
 from langchain_community.vectorstores import Chroma
 from langchain_community.chat_models import ChatOllama
-from langchain_community.embeddings import FastEmbedEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema.output_parser import StrOutputParser
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -15,13 +15,13 @@ class ChatPDF:
     chain = None
 
     def __init__(self):
-        self.model = ChatOllama(model="mistral")
+        self.model = ChatOllama(model="dolphin-mistral:v2.6", base_url="http://192.168.1.117:11434")
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=100)
         self.prompt = PromptTemplate.from_template(
             """
             <s> [INST] You are an assistant for question-answering tasks. Use the following pieces of retrieved context 
-            to answer the question. If you don't know the answer, just say that you don't know. Use three sentences
-             maximum and keep the answer concise. [/INST] </s> 
+            to answer the question. If you don't know the answer, just say that you don't know. Please answer in detail 
+            using a bulleted list format if possible. 必须使用中文回答。[/INST] </s> 
             [INST] Question: {question} 
             Context: {context} 
             Answer: [/INST]
@@ -33,7 +33,12 @@ class ChatPDF:
         chunks = self.text_splitter.split_documents(docs)
         chunks = filter_complex_metadata(chunks)
 
-        vector_store = Chroma.from_documents(documents=chunks, embedding=FastEmbedEmbeddings())
+        vector_store = Chroma.from_documents(documents=chunks,
+                                             embedding=HuggingFaceEmbeddings(
+                                                 model_name="DMetaSoul/Dmeta-embedding",
+                                                 model_kwargs={'device': 'mps'},
+                                                 encode_kwargs={'normalize_embeddings': True}
+                                             ))
         self.retriever = vector_store.as_retriever(
             search_type="similarity_score_threshold",
             search_kwargs={
